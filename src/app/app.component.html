@@ -1,0 +1,14 @@
+<div *ngIf="!isNavigatedAway" class="welcome-container">
+  <div class="welcome-card">
+    <h1>Welcome to Event Planner</h1>
+    <p>Plan, organize, and enjoy your events effortlessly!</p>
+    <div class="button-group">
+      <a class="btn" [routerLink]="['/signin']">Sign In</a>
+      <a class="btn" [routerLink]="['/register']">Register</a>
+    </div>
+  </div>
+</div>
+
+<router-outlet></router-outlet>
+
+

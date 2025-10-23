@@ -1,0 +1,6 @@
+routerLink or the html blincking problem fixed!!!!
+the blincking problem of raw html
+the register problem of stoping if password missmatch
+if i go to sigin and than back i see nothing on the root page
+
+i must do somehow events/userId/eventId way in the database

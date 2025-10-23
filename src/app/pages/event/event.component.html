@@ -1,0 +1,201 @@
+<div class="event-calendar-container">
+  <!-- Participants Sidebar Toggle Button -->
+  <button class="sidebar-toggle" (click)="toggleParticipantsSidebar()" [class.open]="isParticipantsSidebarOpen">
+    <span class="toggle-icon">{{ isParticipantsSidebarOpen ? '◀' : '▶' }}</span>
+  </button>
+
+  <!-- Participants Sidebar -->
+  <div class="participants-sidebar" [class.open]="isParticipantsSidebarOpen">
+    <div class="sidebar-header">
+      <h3>Event Participants</h3>
+      <button class="close-sidebar" (click)="toggleParticipantsSidebar()">&times;</button>
+    </div>
+    <div class="sidebar-content">
+      <div *ngIf="mainEventAttendees.length > 0" class="participants-list">
+        <div *ngFor="let attendee of mainEventAttendees" class="participant-item">
+          <div class="participant-info">
+            <span class="participant-email">{{ attendee.email }}</span>
+          </div>
+
+          <!-- Show action buttons only if user is owner AND attendee is NOT the owner -->
+          <div class="participant-actions" *ngIf="isOwner && attendee.uid !== ownerId">
+            <button class="promote-owner-btn" title="Promote to Owner" (click)="promoteToOwner(attendee.uid, attendee.email)">👑</button>
+            <button class="delete-participant-btn" (click)="deleteParticipant(attendee.uid, attendee.email)" title="Remove participant">🗑️</button>
+          </div>
+        </div>
+      </div>
+      <p *ngIf="mainEventAttendees.length === 0" class="no-participants">No participants in this event yet.</p>
+    </div>
+  </div>
+
+  <!-- Overlay for sidebar -->
+  <div class="sidebar-overlay" *ngIf="isParticipantsSidebarOpen" (click)="toggleParticipantsSidebar()"></div>
+
+  <!-- Calendar Header -->
+  <div class="calendar-header">
+    <button (click)="goBack()">Back to Dashboard</button>
+    <button (click)="changeMonth('prev')">Previous</button>
+    <h2>{{ currentMonth | date:'MMMM yyyy' }}</h2>
+    <button (click)="changeMonth('next')">Next</button>
+    <button *ngIf="isOwner" (click)="openAddEventModal()">Add Event</button>
+    <button (click)="viewAddedEvents()">View Added Events</button>
+  </div>
+
+  <!-- Calendar Grid -->
+  <div class="calendar-grid">
+    <div *ngFor="let day of daysInMonth" class="calendar-day">
+      <div class="day-number">{{ day.date.getDate() }}</div>
+      <div class="day-events">
+        <div *ngFor="let eventKey of getEventsForDay(day.date)" class="event">
+          <span class="event-name">{{ eventData?.events?.[eventKey]?.name || 'Event has no given name!' }}</span>
+          <span class="event-details">
+            {{ eventData?.events?.[eventKey]?.details || 'No details about the event are yet available!' }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Event Modal -->
+  <div *ngIf="isAddEventModalOpen" class="modal">
+    <div class="modal-content">
+      <span class="close" (click)="closeAddEventModal()">&times;</span>
+      <h2>Add New Event</h2>
+      <form (ngSubmit)="addEvent()">
+        <input type="text" [(ngModel)]="newEvent.name" name="eventName" placeholder="Event Name" required>
+        <input type="date" [(ngModel)]="newEvent.startDate" name="startDate" required>
+        <input type="date" [(ngModel)]="newEvent.endDate" name="endDate" required>
+        <input id="start-time" type="time" [(ngModel)]="newEvent.startTime" name="startTime">
+        <textarea [(ngModel)]="newEvent.details" name="eventDetails" placeholder="Event Details"></textarea>
+        <input type="file" (change)="onPhotoSelected($event)" accept="image/*">
+        <button type="submit">Add Event</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Added Events Section -->
+  <div *ngIf="showAddedEvents">
+    <h3>Added Events</h3>
+    <ul>
+      <li *ngFor="let event of addedEvents">
+        <strong>{{ event.name }}</strong> ({{ event.startDate }} - {{ event.endDate }})
+        <p>Start time: {{ event.startTime }}</p>
+        <p>{{ event.details }}</p>
+
+        <!-- My Attendance Status -->
+        <div class="my-attendance">
+          <h4>My Attendance:</h4>
+          <div class="attendance-status">
+            <div class="attendance-option">
+              <div class="attendance-circle" [ngClass]="{ 'attending': getCurrentUserStatus(event) === 'attending' }" (click)="updateMyAttendance(event, 'attending')"></div>
+              <span>Attending</span>
+            </div>
+            <div class="attendance-option">
+              <div class="attendance-circle" [ngClass]="{ 'not-attending': getCurrentUserStatus(event) === 'not attending' }" (click)="updateMyAttendance(event, 'not attending')"></div>
+              <span>Not Attending</span>
+            </div>
+            <div class="attendance-option">
+              <div class="attendance-circle" [ngClass]="{ 'not-sure': getCurrentUserStatus(event) === 'not sure' }" (click)="updateMyAttendance(event, 'not sure')"></div>
+              <span>Not Sure</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attendees List -->
+        <div *ngIf="isOwner" class="attendees-list">
+          <h4>All Attendees:</h4>
+          <div *ngIf="event.attendees && getAttendeesArray(event).length > 0">
+            <ul class="attendees-simple-list">
+              <li *ngFor="let attendee of getAttendeesArray(event)"
+                  class="attendee-simple-item"
+                  [ngClass]="{
+                    'status-attending': attendee.status === 'attending',
+                    'status-not-attending': attendee.status === 'not attending',
+                    'status-not-sure': attendee.status === 'not sure'
+                  }">
+                {{ attendee.email }}
+              </li>
+            </ul>
+          </div>
+          <p *ngIf="!event.attendees || getAttendeesArray(event).length === 0" class="no-attendees">No attendees yet.</p>
+        </div>
+
+        <!-- Edit/Delete Buttons -->
+        <button *ngIf="isOwner" (click)="editEvent(event)">Edit</button>
+        <button *ngIf="isOwner" (click)="deleteEvent(event.id)">Delete</button>
+
+        <!-- Event Photo -->
+        <div class="event-details">
+          <img *ngIf="event.photo" [src]="event.photo" alt="{{ event.name }} photo" class="event-photo" />
+        </div>
+
+        <!-- Reviews Section -->
+        <div class="reviews-section">
+          <h4>Reviews:</h4>
+
+          <div class="review-sorting">
+            <label for="sort">Sort by:</label>
+            <select id="sort" [(ngModel)]="reviewSortOption" (change)="sortReviews(event)">
+              <option value="dateDesc">Newest First</option>
+              <option value="dateAsc">Oldest First</option>
+              <option value="alpha">Alphabetical (A-Z)</option>
+            </select>
+          </div>
+
+          <div *ngIf="event.reviews; else noReviews">
+            <div *ngFor="let review of getSortedReviews(event.reviews)" class="review-item">
+              <div class="review-header">
+                <span class="review-email">{{ review.userEmail || 'Anonymous' }}</span>
+                <span class="review-rating">⭐ {{ review.rating || 0 }}/5</span>
+              </div>
+              <p class="review-comment">"{{ review.comment || 'No comment.' }}"</p>
+              <img *ngIf="review.photo" [src]="review.photo" alt="Review photo" class="review-photo" />
+              <p class="review-timestamp">{{ review.timestamp | date:'short' }}</p>
+              <hr />
+            </div>
+          </div>
+
+          <ng-template #noReviews>
+            <p class="no-reviews">No reviews yet. Be the first to write one!</p>
+          </ng-template>
+
+          <!-- Add Review Form -->
+          <div class="add-review-form">
+            <textarea [(ngModel)]="newReview.comment" placeholder="Write your review..." rows="2"></textarea>
+            <select [(ngModel)]="newReview.rating">
+              <option value="0">Select rating</option>
+              <option *ngFor="let r of [1,2,3,4,5]" [value]="r">{{ r }} ⭐</option>
+            </select>
+
+            <input type="file" (change)="onReviewPhotoSelected($event)" accept="image/*">
+            <img *ngIf="newReview.photo" [src]="newReview.photo" alt="Review preview" class="review-photo-preview"/>
+
+            <button (click)="addReview(event.id)">Submit Review</button>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Deleted Event Message -->
+  <div *ngIf="isEventDeleted" class="success-message">
+    <p>{{ eventDeleteMessage }}</p>
+  </div>
+
+  <!-- Edit Event Modal -->
+  <div *ngIf="isEditEventModalOpen" class="modal">
+    <div class="modal-content">
+      <span class="close" (click)="closeEditEventModal()">&times;</span>
+      <h2>Edit Event</h2>
+      <form (ngSubmit)="updateEvent()">
+        <input type="text" [(ngModel)]="editableEvent.name" name="eventName" required>
+        <input type="date" [(ngModel)]="editableEvent.startDate" name="startDate" required>
+        <input type="date" [(ngModel)]="editableEvent.endDate" name="endDate" required>
+        <input id="edit-start-time" type="time" [(ngModel)]="editableEvent.startTime" name="startTime">
+        <textarea [(ngModel)]="editableEvent.details" name="eventDetails"></textarea>
+        <input type="file" (change)="onEditPhotoSelected($event)" accept="image/*">
+        <button type="submit">Save Changes</button>
+      </form>
+    </div>
+  </div>
+</div>

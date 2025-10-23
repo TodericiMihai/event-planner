@@ -1,0 +1,68 @@
+<div class="events-container">
+  <!-- Event Management Buttons -->
+  <div class="event-buttons">
+    <button (click)="openSlide('create')">Create New Event</button>
+    <button (click)="openSlide('join')">Join an Event</button>
+    <button (click)="logout()">Logout</button>
+  </div>
+
+  <!-- Sliding Panel -->
+  <div class="slide-panel" [class.open]="slideType">
+    <div class="panel-content">
+      <button class="close-btn" (click)="closeSlide()">×</button>
+
+      <!-- Create Event Form -->
+      <div *ngIf="slideType === 'create'">
+        <h2>Create New Event</h2>
+        <form (submit)="createEvent()">
+          <label for="eventName">Event Name:</label>
+          <input type="text" id="eventName" [(ngModel)]="newEvent.name" name="eventName" required />
+
+
+          <button type="submit">Create Event</button>
+        </form>
+      </div>
+
+      <!-- Join Event Form -->
+      <div *ngIf="slideType === 'join'">
+        <h2>Join an Event</h2>
+        <form (submit)="joinEvent()">
+          <label for="joinCode">Event Code:</label>
+          <input type="text" id="joinCode" [(ngModel)]="joinCode" name="joinCode" required />
+
+          <button type="submit">Join</button>
+        </form>
+      </div>
+
+
+
+
+    </div>
+  </div>
+
+  <!-- List of Created Events -->
+  <div class="event-list">
+    <h2>Your Created Events</h2>
+    <div *ngFor="let event of events" class="event-item" (click)="navigateToEvent(event)">
+      <h3>{{ event.name }}</h3>
+
+      <div class="event-code">
+        <span>Code: {{ event.code }}</span>
+        <button (click)="copyToClipboard(event.code); $event.stopPropagation()">Copy</button>
+      </div>
+      <button *ngIf="event.ownerId === userId" (click)="deleteEvent(event.id); $event.stopPropagation()">Delete</button>
+    </div>
+  </div>
+
+  <!-- List of Joined Events -->
+  <div class="event-list">
+    <h2>Events You've Joined</h2>
+    <div *ngFor="let event of joinedEvent" class="event-item" (click)="navigateToEvent(event)">
+      <h3>{{ event.name }}</h3>
+      <p>Hosted by: {{ event.ownerId }}</p>
+      <div class="event-code">
+        <span>Event Code: {{ event.code }}</span>
+      </div>
+    </div>
+  </div>
+</div>
