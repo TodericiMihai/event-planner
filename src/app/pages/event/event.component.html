@@ -37,6 +37,8 @@
     <button (click)="changeMonth('prev')">Previous</button>
     <h2>{{ currentMonth | date:'MMMM yyyy' }}</h2>
     <button (click)="changeMonth('next')">Next</button>
+    <button *ngIf="isOwner" (click)="openAddLocationModal()">Add Location</button>
+    <button (click)="openViewLocationsModal()">View Locations</button>
     <button *ngIf="isOwner" (click)="openAddEventModal()">Add Event</button>
     <button (click)="viewAddedEvents()">View Added Events</button>
   </div>
@@ -51,9 +53,41 @@
           <span class="event-details">
             {{ eventData?.events?.[eventKey]?.details || 'No details about the event are yet available!' }}
           </span>
+          <span class="event-location" *ngIf="eventData?.events?.[eventKey]?.locationId">
+            📍 {{ getLocationName(eventData?.events?.[eventKey]?.locationId) }}
+          </span>
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- View Locations Section (appears below calendar) -->
+  <div *ngIf="isViewLocationsModalOpen" class="locations-display-section">
+    <div class="locations-header">
+      <h2>Event Locations</h2>
+      <button (click)="closeViewLocationsModal()" class="close-locations-btn">Close</button>
+    </div>
+
+    <div *ngIf="locations.length > 0; else noLocations">
+      <!-- Location Cards -->
+      <div class="locations-grid">
+        <div *ngFor="let location of locations" class="location-card">
+          <h3>{{ location.name }}</h3>
+          <p class="location-address">📍 {{ location.address }}</p>
+          <p *ngIf="location.description" class="location-description">{{ location.description }}</p>
+
+          <div *ngIf="isOwner" class="location-actions">
+            <button (click)="editLocation(location)" class="btn-edit">Edit</button>
+            <button (click)="deleteLocation(location.id)" class="btn-delete">Delete</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <ng-template #noLocations>
+      <p class="no-locations">No locations added yet.</p>
+    </ng-template>
   </div>
 
   <!-- Add Event Modal -->
@@ -63,6 +97,15 @@
       <h2>Add New Event</h2>
       <form (ngSubmit)="addEvent()">
         <input type="text" [(ngModel)]="newEvent.name" name="eventName" placeholder="Event Name" required>
+
+        <label for="location-select">Select Location:</label>
+        <select id="location-select" [(ngModel)]="newEvent.locationId" name="eventLocation">
+          <option value="">-- Select a location --</option>
+          <option *ngFor="let location of locations" [value]="location.id">
+            {{ location.name }} - {{ location.address }}
+          </option>
+        </select>
+
         <input type="date" [(ngModel)]="newEvent.startDate" name="startDate" required>
         <input type="date" [(ngModel)]="newEvent.endDate" name="endDate" required>
         <input id="start-time" type="time" [(ngModel)]="newEvent.startTime" name="startTime">
@@ -79,6 +122,15 @@
     <ul>
       <li *ngFor="let event of addedEvents">
         <strong>{{ event.name }}</strong> ({{ event.startDate }} - {{ event.endDate }})
+        <div *ngIf="event.locationId" class="event-location-display">
+          <p>📍 <strong>Location:</strong> {{ getLocationName(event.locationId) }}</p>
+          <p *ngIf="getLocationDetails(event.locationId)?.address" class="location-address">
+            {{ getLocationDetails(event.locationId)?.address }}
+          </p>
+          <p *ngIf="getLocationDetails(event.locationId)?.description" class="location-description">
+            {{ getLocationDetails(event.locationId)?.description }}
+          </p>
+        </div>
         <p>Start time: {{ event.startTime }}</p>
         <p>{{ event.details }}</p>
 
@@ -189,6 +241,15 @@
       <h2>Edit Event</h2>
       <form (ngSubmit)="updateEvent()">
         <input type="text" [(ngModel)]="editableEvent.name" name="eventName" required>
+
+        <label for="edit-location-select">Select Location:</label>
+        <select id="edit-location-select" [(ngModel)]="editableEvent.locationId" name="eventLocation">
+          <option value="">-- Select a location --</option>
+          <option *ngFor="let location of locations" [value]="location.id">
+            {{ location.name }} - {{ location.address }}
+          </option>
+        </select>
+
         <input type="date" [(ngModel)]="editableEvent.startDate" name="startDate" required>
         <input type="date" [(ngModel)]="editableEvent.endDate" name="endDate" required>
         <input id="edit-start-time" type="time" [(ngModel)]="editableEvent.startTime" name="startTime">
@@ -198,4 +259,19 @@
       </form>
     </div>
   </div>
+
+  <!-- Add Location Modal -->
+  <div *ngIf="isAddLocationModalOpen" class="modal">
+    <div class="modal-content">
+      <span class="close" (click)="closeAddLocationModal()">&times;</span>
+      <h2>Add New Location</h2>
+      <form (ngSubmit)="addLocation()">
+        <input type="text" [(ngModel)]="newLocation.name" name="locationName" placeholder="Location Name" required>
+        <input type="text" [(ngModel)]="newLocation.address" name="locationAddress" placeholder="Address" required>
+        <textarea [(ngModel)]="newLocation.description" name="locationDescription" placeholder="Description (optional)"></textarea>
+        <button type="submit">Add Location</button>
+      </form>
+    </div>
+  </div>
+
 </div>

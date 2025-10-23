@@ -1,8 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import {Component, OnInit, ViewChild} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Auth } from '@angular/fire/auth';
 import { Database, ref, get, set, push, remove, update } from '@angular/fire/database';
 import { FormsModule } from '@angular/forms';
+import {GoogleMap} from '@angular/google-maps';
 
 interface CalendarEvent {
   id?: string;
@@ -12,6 +13,7 @@ interface CalendarEvent {
   details: string;
   photo?: string;
   startTime?: string;
+  locationId?: string;
   ownerId: string;
   attendees?: { [email: string]: AttendeeData };
   events?: { [key: string]: any };
@@ -24,6 +26,13 @@ interface CalendarEvent {
       photo?: string;
     };
   };
+}
+
+interface Location {
+  id?: string;
+  name: string;
+  address: string;
+  description?: string;
 }
 
 interface AttendeeData {
@@ -50,6 +59,7 @@ export class EventComponent implements OnInit {
     endDate: '',
     details: '',
     photo: '',
+    locationId: '',
     ownerId: '',
   };
   newReview: { comment: string; rating: number; photo?:string } = { comment: '', rating: 0 };
@@ -67,10 +77,29 @@ export class EventComponent implements OnInit {
     endDate: '',
     details: '',
     photo: '',
+    locationId: '',
     ownerId: '',
   };
   isParticipantsSidebarOpen: boolean = false;
   mainEventAttendees: { uid: string, email: string }[] = [];
+
+  // Location management
+  locations: Location[] = [];
+  isAddLocationModalOpen: boolean = false;
+  isViewLocationsModalOpen: boolean = false;
+  newLocation: Location = {
+    name: '',
+    address: '',
+    description: ''
+  };
+  editableLocation: Location = {
+    name: '',
+    address: '',
+    description: ''
+  };
+  isEditLocationModalOpen: boolean = false;
+  mapReady: boolean = false;  // ADD THIS LINE
+  @ViewChild(GoogleMap) map!: GoogleMap;
 
   constructor(
     private route: ActivatedRoute,
@@ -90,6 +119,7 @@ export class EventComponent implements OnInit {
       this.generateCalendar();
       this.fetchEventDetails();
       this.fetchMainEventAttendees();
+      this.fetchLocations();
     });
   }
 
@@ -163,6 +193,7 @@ export class EventComponent implements OnInit {
       endDate: '',
       details: '',
       photo: '',
+      locationId: '',
       ownerId: this.currentUserId || '',
     };
   }
@@ -326,6 +357,7 @@ export class EventComponent implements OnInit {
       endDate: '',
       details: '',
       photo: '',
+      locationId: '',
       ownerId: this.currentUserId || '',
     };
   }
@@ -702,5 +734,157 @@ export class EventComponent implements OnInit {
     }
   }
 
-}
+  // Location Management Methods
+  async fetchLocations() {
+    if (!this.ownerId || !this.eventId) {
+      console.error('Missing owner or event ID');
+      return;
+    }
 
+    const locationsRef = ref(this.db, `events/${this.ownerId}/${this.eventId}/locations`);
+
+    try {
+      const snapshot = await get(locationsRef);
+      if (snapshot.exists()) {
+        const locationsData = snapshot.val();
+        this.locations = Object.keys(locationsData).map(key => ({
+          id: key,
+          ...locationsData[key]
+        }));
+      } else {
+        this.locations = [];
+      }
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+    }
+  }
+
+  openAddLocationModal() {
+    this.isAddLocationModalOpen = true;
+  }
+
+  closeAddLocationModal() {
+    this.isAddLocationModalOpen = false;
+    this.newLocation = {
+      name: '',
+      address: '',
+      description: ''
+    };
+  }
+
+  async addLocation() {
+    if (!this.isOwner) {
+      alert('Only the owner can add locations.');
+      return;
+    }
+
+    if (!this.newLocation.name.trim() || !this.newLocation.address.trim()) {
+      alert('Please provide both location name and address.');
+      return;
+    }
+
+    const locationsRef = ref(this.db, `events/${this.ownerId}/${this.eventId}/locations`);
+    const newLocationRef = push(locationsRef);
+
+    try {
+      await set(newLocationRef, this.newLocation);
+      alert('Location added successfully!');
+      this.closeAddLocationModal();
+      this.fetchLocations();
+    } catch (error) {
+      console.error('Error adding location:', error);
+      alert('Failed to add location.');
+    }
+  }
+
+  closeViewLocationsModal() {
+    this.isViewLocationsModalOpen = false;
+    this.mapReady = false;  // ADD THIS LINE
+  }
+
+  editLocation(location: Location) {
+    this.editableLocation = { ...location };
+    this.isEditLocationModalOpen = true;
+  }
+
+  closeEditLocationModal() {
+    this.isEditLocationModalOpen = false;
+    this.editableLocation = {
+      name: '',
+      address: '',
+      description: ''
+    };
+  }
+
+  async updateLocation() {
+    if (!this.isOwner) {
+      alert('Only the owner can edit locations.');
+      return;
+    }
+
+    const locationRef = ref(
+      this.db,
+      `events/${this.ownerId}/${this.eventId}/locations/${this.editableLocation.id}`
+    );
+
+    try {
+      await set(locationRef, {
+        name: this.editableLocation.name,
+        address: this.editableLocation.address,
+        description: this.editableLocation.description
+      });
+      alert('Location updated successfully!');
+      this.closeEditLocationModal();
+      this.fetchLocations();
+    } catch (error) {
+      console.error('Error updating location:', error);
+      alert('Failed to update location.');
+    }
+  }
+
+  async deleteLocation(locationId: string | undefined) {
+    if (!this.isOwner) {
+      alert('Only the owner can delete locations.');
+      return;
+    }
+
+    if (!locationId) {
+      console.error('Location ID is missing.');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this location?')) {
+      return;
+    }
+
+    const locationRef = ref(this.db, `events/${this.ownerId}/${this.eventId}/locations/${locationId}`);
+
+    try {
+      await remove(locationRef);
+      alert('Location deleted successfully!');
+      this.fetchLocations();
+    } catch (error) {
+      console.error('Error deleting location:', error);
+      alert('Failed to delete location.');
+    }
+  }
+
+  getLocationName(locationId: string | undefined): string {
+    if (!locationId) return 'No location selected';
+    const location = this.locations.find(loc => loc.id === locationId);
+    return location ? location.name : 'Unknown location';
+  }
+
+  getLocationDetails(locationId: string | undefined): Location | null {
+    if (!locationId) return null;
+    return this.locations.find(loc => loc.id === locationId) || null;
+  }
+  async openViewLocationsModal() {
+    await this.fetchLocations();
+    this.isViewLocationsModalOpen = true;
+    this.mapReady = false;
+
+
+  }
+
+}

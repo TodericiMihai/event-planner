@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { EventRoutingModule } from './event-routing.module';
 import { EventComponent } from './event.component';
 import { provideDatabase, getDatabase } from '@angular/fire/database';
+import {GoogleMap, MapMarker} from '@angular/google-maps';
 
 @NgModule({
   declarations: [
@@ -14,6 +15,8 @@ import { provideDatabase, getDatabase } from '@angular/fire/database';
     CommonModule,
     EventRoutingModule,
     FormsModule,
+    GoogleMap,
+    MapMarker,
   ],
   providers: [
     // If you're using provideDatabase
